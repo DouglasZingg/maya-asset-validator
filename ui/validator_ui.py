@@ -31,6 +31,22 @@ class AssetValidatorUI(QtWidgets.QDialog):
 
         self.build_ui()
         self.connect_signals()
+        
+    def clear_results(self):
+        self.results_list.clear()
+        self.status_label.setText("Results cleared")
+        
+    def add_result(self, level, message):
+        item = QtWidgets.QListWidgetItem(f"[{level}] {message}")
+
+        if level == "ERROR":
+            item.setForeground(QtGui.QColor("red"))
+        elif level == "WARNING":
+            item.setForeground(QtGui.QColor("orange"))
+        else:
+            item.setForeground(QtGui.QColor("white"))
+
+        self.results_list.addItem(item)
 
     # ---------------------------
     # UI Construction
@@ -73,35 +89,24 @@ class AssetValidatorUI(QtWidgets.QDialog):
         self.clear_btn.clicked.connect(self.clear_results)
 
     # ---------------------------
-    # Placeholder Logic
+    # Validation Logic
     # ---------------------------
     def run_validation(self):
-        self.results_list.clear()
+        from core.naming_checks import run_naming_checks
 
-        # Placeholder messages (Day 3+ will replace these)
-        self.add_result("INFO", "Validation started")
-        self.add_result("WARNING", "Example warning: Non-frozen transforms found")
-        self.add_result("ERROR", "Example error: Missing texture file")
+        self.results_list.clear()
+        self.status_label.setText("Running validation...")
+
+        results = run_naming_checks()
+
+        if not results:
+            self.add_result("INFO", "Scene passed naming validation")
+        else:
+            for result in results:
+                msg = f"{result['node']} — {result['message']}"
+                self.add_result(result["level"], msg)
 
         self.status_label.setText("Validation complete")
-
-    def clear_results(self):
-        self.results_list.clear()
-        self.status_label.setText("Results cleared")
-
-    def add_result(self, level, message):
-        item = QtWidgets.QListWidgetItem(f"[{level}] {message}")
-
-        # Color coding
-        if level == "ERROR":
-            item.setForeground(QtGui.QColor("red"))
-        elif level == "WARNING":
-            item.setForeground(QtGui.QColor("orange"))
-        else:
-            item.setForeground(QtGui.QColor("white"))
-
-        self.results_list.addItem(item)
-
 
 # ---------------------------
 # Window Launcher
