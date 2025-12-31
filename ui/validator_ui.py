@@ -77,26 +77,26 @@ class AssetValidatorUI(QtWidgets.QDialog):
     # Validation Logic
     # ---------------------------
     def run_validation(self):
-        # Imports inside method for Maya-friendly reload behavior
         from core.naming_checks import run_naming_checks
         from core.transform_checks import run_transform_checks
-
+        from core.geometry_checks import run_geometry_checks
+    
         self.results_list.clear()
         self.status_label.setText("Running validation...")
-
+    
         results = []
         results.extend(run_naming_checks())
         results.extend(run_transform_checks())
-
+        results.extend(run_geometry_checks())
+    
         if not results:
             self.add_result("INFO", "Scene passed validation")
         else:
             for result in results:
                 msg = f"{result['node']} — {result['message']}"
                 self.add_result(result["level"], msg)
-
+    
         self.status_label.setText("Validation complete")
-
 
     def clear_results(self):
         self.results_list.clear()
