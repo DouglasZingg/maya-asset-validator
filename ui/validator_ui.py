@@ -16,6 +16,7 @@ except ImportError:
 
 import maya.OpenMayaUI as omui
 
+
 def get_maya_main_window():
     ptr = omui.MQtUtil.mainWindow()
     return wrapInstance(int(ptr), QtWidgets.QWidget)
@@ -31,22 +32,6 @@ class AssetValidatorUI(QtWidgets.QDialog):
 
         self.build_ui()
         self.connect_signals()
-        
-    def clear_results(self):
-        self.results_list.clear()
-        self.status_label.setText("Results cleared")
-        
-    def add_result(self, level, message):
-        item = QtWidgets.QListWidgetItem(f"[{level}] {message}")
-
-        if level == "ERROR":
-            item.setForeground(QtGui.QColor("red"))
-        elif level == "WARNING":
-            item.setForeground(QtGui.QColor("orange"))
-        else:
-            item.setForeground(QtGui.QColor("white"))
-
-        self.results_list.addItem(item)
 
     # ---------------------------
     # UI Construction
@@ -54,12 +39,12 @@ class AssetValidatorUI(QtWidgets.QDialog):
     def build_ui(self):
         main_layout = QtWidgets.QVBoxLayout(self)
 
-        # --- Header ---
+        # Header
         header = QtWidgets.QLabel("Asset Validation Tool")
         header.setStyleSheet("font-size: 16px; font-weight: bold;")
         main_layout.addWidget(header)
 
-        # --- Buttons ---
+        # Buttons
         button_layout = QtWidgets.QHBoxLayout()
 
         self.validate_btn = QtWidgets.QPushButton("Validate Scene")
@@ -71,12 +56,12 @@ class AssetValidatorUI(QtWidgets.QDialog):
 
         main_layout.addLayout(button_layout)
 
-        # --- Results List ---
+        # Results list
         self.results_list = QtWidgets.QListWidget()
         self.results_list.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
         main_layout.addWidget(self.results_list)
 
-        # --- Status Bar ---
+        # Status bar
         self.status_label = QtWidgets.QLabel("Ready")
         self.status_label.setStyleSheet("color: gray;")
         main_layout.addWidget(self.status_label)
@@ -92,21 +77,44 @@ class AssetValidatorUI(QtWidgets.QDialog):
     # Validation Logic
     # ---------------------------
     def run_validation(self):
+        # Imports inside method for Maya-friendly reload behavior
         from core.naming_checks import run_naming_checks
+        from core.transform_checks import run_transform_checks
 
         self.results_list.clear()
         self.status_label.setText("Running validation...")
 
-        results = run_naming_checks()
+        results = []
+        results.extend(run_naming_checks())
+        results.extend(run_transform_checks())
 
         if not results:
-            self.add_result("INFO", "Scene passed naming validation")
+            self.add_result("INFO", "Scene passed validation")
         else:
             for result in results:
                 msg = f"{result['node']} — {result['message']}"
                 self.add_result(result["level"], msg)
 
         self.status_label.setText("Validation complete")
+
+
+    def clear_results(self):
+        self.results_list.clear()
+        self.status_label.setText("Results cleared")
+
+    def add_result(self, level, message):
+        item = QtWidgets.QListWidgetItem(f"[{level}] {message}")
+
+        # Color coding
+        if level == "ERROR":
+            item.setForeground(QtGui.QColor("red"))
+        elif level == "WARNING":
+            item.setForeground(QtGui.QColor("orange"))
+        else:
+            item.setForeground(QtGui.QColor("white"))
+
+        self.results_list.addItem(item)
+
 
 # ---------------------------
 # Window Launcher
@@ -116,7 +124,7 @@ def show():
     try:
         asset_validator_window.close()
         asset_validator_window.deleteLater()
-    except:
+    except Exception:
         pass
 
     asset_validator_window = AssetValidatorUI()
