@@ -32,6 +32,41 @@ class AssetValidatorUI(QtWidgets.QDialog):
 
         self.build_ui()
         self.connect_signals()
+        
+    def run_auto_fix(self):
+        from core.auto_fix import run_auto_fix
+    
+        # Confirmation dialog
+        msg = (
+            "Auto Fix will attempt to:\n"
+            "• Freeze transforms (mesh objects)\n"
+            "• Center pivots (mesh objects)\n"
+            "• Delete unused nodes\n\n"
+            "This is undoable with a single Ctrl+Z.\n\n"
+            "Continue?"
+        )
+    
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            "Confirm Auto Fix",
+            msg,
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+        )
+    
+        if reply != QtWidgets.QMessageBox.Yes:
+            self.status_label.setText("Auto Fix cancelled")
+            return
+    
+        self.status_label.setText("Running Auto Fix...")
+        actions = run_auto_fix()
+    
+        # Show what happened
+        for a in actions:
+            msg = f"{a['node']} — {a['message']}"
+            self.add_result(a["level"], msg)
+    
+        self.status_label.setText("Auto Fix complete")
+
 
     # ---------------------------
     # UI Construction
@@ -49,8 +84,10 @@ class AssetValidatorUI(QtWidgets.QDialog):
 
         self.validate_btn = QtWidgets.QPushButton("Validate Scene")
         self.clear_btn = QtWidgets.QPushButton("Clear Results")
+        self.autofix_btn = QtWidgets.QPushButton("Auto Fix")
 
         button_layout.addWidget(self.validate_btn)
+        button_layout.addWidget(self.autofix_btn)
         button_layout.addWidget(self.clear_btn)
         button_layout.addStretch()
 
@@ -71,6 +108,7 @@ class AssetValidatorUI(QtWidgets.QDialog):
     # ---------------------------
     def connect_signals(self):
         self.validate_btn.clicked.connect(self.run_validation)
+        self.autofix_btn.clicked.connect(self.run_auto_fix)
         self.clear_btn.clicked.connect(self.clear_results)
 
     # ---------------------------
