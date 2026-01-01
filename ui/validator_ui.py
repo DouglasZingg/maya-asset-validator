@@ -31,6 +31,7 @@ class AssetValidatorUI(QtWidgets.QDialog):
         self.setWindowFlags(self.windowFlags() ^ QtCore.Qt.WindowContextHelpButtonHint)
 
         self.last_results = []
+        self.filtered_results = []
 
         self.build_ui()
         self.connect_signals()
@@ -117,6 +118,87 @@ class AssetValidatorUI(QtWidgets.QDialog):
                 f"Could not export report:\n{e}"
             )
             self.status_label.setText("Export failed")
+    
+    def apply_filters(self):
+        # Filter settings
+        severity = self.severity_filter.currentText()
+        query = self.search_box.text().strip().lower()
+    
+        # Compute summary
+        counts = {"ERROR": 0, "WARNING": 0, "INFO": 0}
+        for r in self.last_results:
+            lvl = r.get("level", "INFO")
+            if lvl in counts:
+                counts[lvl] += 1
+    
+        total = len(self.last_results)
+        self.summary_label.setText(
+            f"ERROR: {counts['ERROR']} | WARNING: {counts['WARNING']} | INFO: {counts['INFO']} | Total: {total}"
+        )
+    
+        # Apply filters
+        filtered = []
+        for r in self.last_results:
+            lvl = r.get("level", "INFO")
+            node = (r.get("node") or "")
+            msg = (r.get("message") or "")
+    
+            if severity != "All" and lvl != severity:
+                continue
+    
+            if query:
+                hay = f"{lvl} {node} {msg}".lower()
+                if query not in hay:
+                    continue
+    
+            filtered.append(r)
+    
+        self.filtered_results = filtered
+    
+        # Rebuild UI list
+        self.results_list.clear()
+        if not filtered:
+            self.add_result("INFO", "No results match current filters")
+            return
+    
+        for r in filtered:
+            display = f"{r.get('node','')} — {r.get('message','')}"
+            item = QtWidgets.QListWidgetItem(f"[{r.get('level','INFO')}] {display}")
+            # Store the node on the item for double-click selection
+            item.setData(QtCore.Qt.UserRole, r.get("node", ""))
+    
+            # Color
+            lvl = r.get("level", "INFO")
+            if lvl == "ERROR":
+                item.setForeground(QtGui.QColor("red"))
+            elif lvl == "WARNING":
+                item.setForeground(QtGui.QColor("orange"))
+            else:
+                item.setForeground(QtGui.QColor("white"))
+    
+            self.results_list.addItem(item)
+
+    def on_result_double_clicked(self, item):
+        import maya.cmds as cmds
+    
+        node = item.data(QtCore.Qt.UserRole)
+        if not node:
+            return
+    
+        if cmds.objExists(node):
+            cmds.select(node, r=True)
+            self.status_label.setText(f"Selected: {node}")
+        else:
+            self.status_label.setText("Object no longer exists in scene")
+
+    def clear_results(self):
+        self.results_list.clear()
+        self.last_results = []
+        self.filtered_results = []
+        if hasattr(self, "summary_label"):
+            self.summary_label.setText("ERROR: 0 | WARNING: 0 | INFO: 0 | Total: 0")
+        self.status_label.setText("Results cleared")
+
 
     # ---------------------------
     # UI Construction
@@ -128,6 +210,27 @@ class AssetValidatorUI(QtWidgets.QDialog):
         header = QtWidgets.QLabel("Asset Validation Tool")
         header.setStyleSheet("font-size: 16px; font-weight: bold;")
         main_layout.addWidget(header)
+
+        # --- Filters Row ---
+        filter_layout = QtWidgets.QHBoxLayout()
+
+        self.severity_filter = QtWidgets.QComboBox()
+        self.severity_filter.addItems(["All", "ERROR", "WARNING", "INFO"])
+
+        self.search_box = QtWidgets.QLineEdit()
+        self.search_box.setPlaceholderText("Search results... (node, message)")
+
+        filter_layout.addWidget(QtWidgets.QLabel("Filter:"))
+        filter_layout.addWidget(self.severity_filter)
+        filter_layout.addSpacing(10)
+        filter_layout.addWidget(self.search_box)
+
+        main_layout.addLayout(filter_layout)
+
+        # --- Summary ---
+        self.summary_label = QtWidgets.QLabel("ERROR: 0 | WARNING: 0 | INFO: 0 | Total: 0")
+        self.summary_label.setStyleSheet("color: gray;")
+        main_layout.addWidget(self.summary_label)
 
         # Buttons
         button_layout = QtWidgets.QHBoxLayout()
@@ -163,6 +266,10 @@ class AssetValidatorUI(QtWidgets.QDialog):
         self.autofix_btn.clicked.connect(self.run_auto_fix)
         self.clear_btn.clicked.connect(self.clear_results)
         self.export_btn.clicked.connect(self.export_report)
+        self.severity_filter.currentIndexChanged.connect(self.apply_filters)
+        self.search_box.textChanged.connect(self.apply_filters)
+        self.results_list.itemDoubleClicked.connect(self.on_result_double_clicked)
+
 
     # ---------------------------
     # Validation Logic
@@ -184,12 +291,8 @@ class AssetValidatorUI(QtWidgets.QDialog):
         
         self.last_results = results
     
-        if not results:
-            self.add_result("INFO", "Scene passed validation")
-        else:
-            for result in results:
-                msg = f"{result['node']} — {result['message']}"
-                self.add_result(result["level"], msg)
+        self.last_results = results
+        self.apply_filters()
     
         self.status_label.setText("Validation complete")
 
