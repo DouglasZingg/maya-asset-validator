@@ -80,6 +80,7 @@ class AssetValidatorUI(QtWidgets.QDialog):
         from core.naming_checks import run_naming_checks
         from core.transform_checks import run_transform_checks
         from core.geometry_checks import run_geometry_checks
+        from core.texture_checks import run_texture_checks
     
         self.results_list.clear()
         self.status_label.setText("Running validation...")
@@ -88,6 +89,7 @@ class AssetValidatorUI(QtWidgets.QDialog):
         results.extend(run_naming_checks())
         results.extend(run_transform_checks())
         results.extend(run_geometry_checks())
+        results.extend(run_texture_checks())
     
         if not results:
             self.add_result("INFO", "Scene passed validation")
@@ -97,6 +99,7 @@ class AssetValidatorUI(QtWidgets.QDialog):
                 self.add_result(result["level"], msg)
     
         self.status_label.setText("Validation complete")
+
 
     def clear_results(self):
         self.results_list.clear()
