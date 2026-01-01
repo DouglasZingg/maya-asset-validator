@@ -30,6 +30,8 @@ class AssetValidatorUI(QtWidgets.QDialog):
         self.setMinimumSize(500, 400)
         self.setWindowFlags(self.windowFlags() ^ QtCore.Qt.WindowContextHelpButtonHint)
 
+        self.last_results = []
+
         self.build_ui()
         self.connect_signals()
         
@@ -67,6 +69,54 @@ class AssetValidatorUI(QtWidgets.QDialog):
     
         self.status_label.setText("Auto Fix complete")
 
+    def export_report(self):
+        from core.reporting import build_report, export_report_json, export_report_txt
+    
+        if not getattr(self, "last_results", None):
+            QtWidgets.QMessageBox.information(
+                self,
+                "No Results",
+                "Nothing to export yet. Run Validate Scene first."
+            )
+            return
+    
+        report = build_report(self.last_results)
+    
+        # Choose path + format
+        default_name = f"{report['meta']['scene_name']}_validation_report.json"
+    
+        filepath, selected_filter = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            "Save Validation Report",
+            default_name,
+            "JSON Report (*.json);;Text Report (*.txt)"
+        )
+    
+        if not filepath:
+            self.status_label.setText("Export cancelled")
+            return
+    
+        try:
+            if filepath.lower().endswith(".txt") or "Text Report" in selected_filter:
+                # ensure extension
+                if not filepath.lower().endswith(".txt"):
+                    filepath += ".txt"
+                export_report_txt(filepath, report)
+            else:
+                if not filepath.lower().endswith(".json"):
+                    filepath += ".json"
+                export_report_json(filepath, report)
+    
+            self.status_label.setText(f"Report saved: {filepath}")
+            self.add_result("INFO", f"Report exported to: {filepath}")
+    
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Export Failed",
+                f"Could not export report:\n{e}"
+            )
+            self.status_label.setText("Export failed")
 
     # ---------------------------
     # UI Construction
@@ -85,9 +135,11 @@ class AssetValidatorUI(QtWidgets.QDialog):
         self.validate_btn = QtWidgets.QPushButton("Validate Scene")
         self.clear_btn = QtWidgets.QPushButton("Clear Results")
         self.autofix_btn = QtWidgets.QPushButton("Auto Fix")
+        self.export_btn = QtWidgets.QPushButton("Export Report")
 
         button_layout.addWidget(self.validate_btn)
         button_layout.addWidget(self.autofix_btn)
+        button_layout.addWidget(self.export_btn)
         button_layout.addWidget(self.clear_btn)
         button_layout.addStretch()
 
@@ -110,6 +162,7 @@ class AssetValidatorUI(QtWidgets.QDialog):
         self.validate_btn.clicked.connect(self.run_validation)
         self.autofix_btn.clicked.connect(self.run_auto_fix)
         self.clear_btn.clicked.connect(self.clear_results)
+        self.export_btn.clicked.connect(self.export_report)
 
     # ---------------------------
     # Validation Logic
@@ -128,6 +181,8 @@ class AssetValidatorUI(QtWidgets.QDialog):
         results.extend(run_transform_checks())
         results.extend(run_geometry_checks())
         results.extend(run_texture_checks())
+        
+        self.last_results = results
     
         if not results:
             self.add_result("INFO", "Scene passed validation")
@@ -137,7 +192,6 @@ class AssetValidatorUI(QtWidgets.QDialog):
                 self.add_result(result["level"], msg)
     
         self.status_label.setText("Validation complete")
-
 
     def clear_results(self):
         self.results_list.clear()
