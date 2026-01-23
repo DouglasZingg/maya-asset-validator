@@ -61,7 +61,7 @@ def export_report_json(filepath, report_dict):
 
 def export_report_txt(filepath, report_dict):
     """
-    Write a human-readable TXT report.
+    Write a readable TXT report.
     """
     folder = os.path.dirname(filepath)
     if folder and not os.path.exists(folder):
